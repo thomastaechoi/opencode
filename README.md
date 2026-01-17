@@ -1,3 +1,5 @@
+> **Privacy first:** Privacy and zero-data retention are the top priority. All code changes must follow this policy.
+
 <p align="center">
   <a href="https://opencode.ai">
     <picture>

@@ -6,13 +6,17 @@ import { Session } from "@/session"
 import { MessageV2 } from "@/session/message-v2"
 import { Storage } from "@/storage/storage"
 import { Log } from "@/util/log"
+import { Privacy } from "@/util/privacy"
 import type * as SDK from "@opencode-ai/sdk/v2"
 
 export namespace ShareNext {
   const log = Log.create({ service: "share-next" })
 
   async function url() {
-    return Config.get().then((x) => x.enterprise?.url ?? "https://opncd.ai")
+    const config = await Config.get()
+    const base = config.enterprise?.url ?? "https://opncd.ai"
+    Privacy.assertOpencodeCloudAllowed({ feature: "share", url: base, config })
+    return base
   }
 
   const disabled = process.env["OPENCODE_DISABLE_SHARE"] === "true" || process.env["OPENCODE_DISABLE_SHARE"] === "1"

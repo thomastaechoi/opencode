@@ -4,10 +4,26 @@
   // "enterprise": {
   //   "url": "https://enterprise.dev.opencode.ai",
   // },
+  "privacy": {
+    "disableOpencodeCloud": true,
+  },
   "instructions": ["STYLE_GUIDE.md"],
   "provider": {
     "opencode": {
       "options": {},
+    },
+    "ollama": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "Ollama (local)",
+      "options": {
+        "baseURL": "http://127.0.0.1:11434/v1",
+      },
+      "models": {
+        "gpt-oss": {
+          "id": "gpt-oss:latest",
+          "name": "gpt-oss (local)",
+        },
+      },
     },
   },
   "mcp": {

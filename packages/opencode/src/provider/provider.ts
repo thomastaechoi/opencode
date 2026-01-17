@@ -13,6 +13,7 @@ import { Env } from "../env"
 import { Instance } from "../project/instance"
 import { Flag } from "../flag/flag"
 import { iife } from "@/util/iife"
+import { Privacy } from "@/util/privacy"
 
 // Direct imports for bundled providers
 import { createAmazonBedrock, type AmazonBedrockProviderSettings } from "@ai-sdk/amazon-bedrock"
@@ -98,11 +99,21 @@ export namespace Provider {
       }
     },
     async opencode(input) {
+      const config = await Config.get()
+      const configuredBaseUrl = iife(() => {
+        const raw = config.provider?.["opencode"]?.options?.["baseURL"] ?? config.provider?.["opencode"]?.options?.["url"]
+        return typeof raw === "string" ? raw : undefined
+      })
+
+      if (Privacy.opencodeCloudDisabled(config) && (!configuredBaseUrl || Privacy.isOpenCodeHostedUrl(configuredBaseUrl))) {
+        input.models = {}
+        return { autoload: false }
+      }
+
       const hasKey = await (async () => {
         const env = Env.all()
         if (input.env.some((item) => env[item])) return true
         if (await Auth.get(input.id)) return true
-        const config = await Config.get()
         if (config.provider?.["opencode"]?.options?.apiKey) return true
         return false
       })()

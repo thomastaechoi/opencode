@@ -38,6 +38,8 @@ import { HTTPException } from "hono/http-exception"
 import { errors } from "./error"
 import { QuestionRoutes } from "./routes/question"
 import { PermissionRoutes } from "./routes/permission"
+import { Config } from "../config/config"
+import { Privacy } from "../util/privacy"
 import { GlobalRoutes } from "./routes/global"
 import { MDNS } from "./mdns"
 
@@ -499,6 +501,16 @@ export namespace Server {
         )
         .all("/*", async (c) => {
           const path = c.req.path
+          const cfg = await Config.get().catch(() => undefined)
+          try {
+            Privacy.assertOpencodeCloudAllowed({
+              feature: "web ui proxy",
+              url: `https://app.opencode.ai${path}`,
+              config: cfg,
+            })
+          } catch (e) {
+            return c.text(e instanceof Error ? e.message : "Blocked by privacy settings", 403)
+          }
 
           const response = await proxy(`https://app.opencode.ai${path}`, {
             ...c.req,

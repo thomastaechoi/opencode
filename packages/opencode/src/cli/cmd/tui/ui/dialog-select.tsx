@@ -20,6 +20,7 @@ export interface DialogSelectProps<T> {
   onFilter?: (query: string) => void
   onSelect?: (option: DialogSelectOption<T>) => void
   skipFilter?: boolean
+  showDisabled?: boolean
   keybind?: {
     keybind?: Keybind.Info
     title: string
@@ -72,12 +73,12 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   let input: InputRenderable
 
   const filtered = createMemo(() => {
-    if (props.skipFilter) return props.options.filter((x) => x.disabled !== true)
-    const needle = store.filter.toLowerCase()
     const options = pipe(
       props.options,
-      filter((x) => x.disabled !== true),
+      filter((x) => (props.showDisabled ? true : x.disabled !== true)),
     )
+    if (props.skipFilter) return options
+    const needle = store.filter.toLowerCase()
     if (!needle) return options
 
     // prioritize title matches (weight: 2) over category matches (weight: 1).
@@ -141,13 +142,31 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
 
   function move(direction: number) {
     if (flat().length === 0) return
-    let next = store.selected + direction
-    if (next < 0) next = flat().length - 1
-    if (next >= flat().length) next = 0
+    const items = flat()
+    const next = (() => {
+      const attempts = Array.from({ length: items.length }, (_, index) => index + 1)
+      for (const attempt of attempts) {
+        const index = store.selected + direction * attempt
+        const normalized = ((index % items.length) + items.length) % items.length
+        if (!items[normalized]?.disabled) return normalized
+      }
+      return store.selected
+    })()
     moveTo(next, true)
   }
 
   function moveTo(next: number, center = false) {
+    const items = flat()
+    if (items.length === 0) return
+    if (items[next]?.disabled) {
+      for (let offset = 0; offset < items.length; offset++) {
+        const index = (next + offset) % items.length
+        if (!items[index]?.disabled) {
+          next = index
+          break
+        }
+      }
+    }
     setStore("selected", next)
     props.onMove?.(selected()!)
     if (!scroll) return
@@ -185,7 +204,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
 
     if (evt.name === "return") {
       const option = selected()
-      if (option) {
+      if (option && !option.disabled) {
         evt.preventDefault()
         evt.stopPropagation()
         if (option.onSelect) option.onSelect(dialog)
@@ -280,19 +299,23 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                         id={JSON.stringify(option.value)}
                         flexDirection="row"
                         onMouseMove={() => {
+                          if (option.disabled) return
                           setStore("input", "mouse")
                         }}
                         onMouseUp={() => {
+                          if (option.disabled) return
                           option.onSelect?.(dialog)
                           props.onSelect?.(option)
                         }}
                         onMouseOver={() => {
+                          if (option.disabled) return
                           if (store.input !== "mouse") return
                           const index = flat().findIndex((x) => isDeepEqual(x.value, option.value))
                           if (index === -1) return
                           moveTo(index)
                         }}
                         onMouseDown={() => {
+                          if (option.disabled) return
                           const index = flat().findIndex((x) => isDeepEqual(x.value, option.value))
                           if (index === -1) return
                           moveTo(index)
@@ -301,17 +324,18 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                         paddingLeft={current() || option.gutter ? 1 : 3}
                         paddingRight={3}
                         gap={1}
-                      >
-                        <Option
-                          title={option.title}
-                          footer={option.footer}
-                          description={option.description !== category ? option.description : undefined}
-                          active={active()}
-                          current={current()}
-                          gutter={option.gutter}
-                        />
-                      </box>
-                    )
+                          >
+                            <Option
+                              title={option.title}
+                              footer={option.footer}
+                              description={option.description !== category ? option.description : undefined}
+                              active={active()}
+                              current={current()}
+                              gutter={option.gutter}
+                              disabled={option.disabled}
+                            />
+                          </box>
+                        )
                   }}
                 </For>
               </>
@@ -345,6 +369,7 @@ function Option(props: {
   footer?: JSX.Element | string
   gutter?: JSX.Element
   onMouseOver?: () => void
+  disabled?: boolean
 }) {
   const { theme } = useTheme()
   const fg = selectedForeground(theme)
@@ -363,8 +388,8 @@ function Option(props: {
       </Show>
       <text
         flexGrow={1}
-        fg={props.active ? fg : props.current ? theme.primary : theme.text}
-        attributes={props.active ? TextAttributes.BOLD : undefined}
+        fg={props.disabled ? theme.textMuted : props.active ? fg : props.current ? theme.primary : theme.text}
+        attributes={props.active && !props.disabled ? TextAttributes.BOLD : undefined}
         overflow="hidden"
         wrapMode="none"
         paddingLeft={3}

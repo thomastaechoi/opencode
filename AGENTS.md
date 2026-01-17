@@ -1,3 +1,5 @@
+- Privacy and zero-data retention are the top priority.
+- All code changes must follow this privacy and zero-data retention policy.
 - To test opencode in `packages/opencode`, run `bun dev`.
 - To regenerate the JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
 - ALWAYS USE PARALLEL TOOLS WHEN APPLICABLE.
