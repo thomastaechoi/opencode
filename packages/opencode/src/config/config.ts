@@ -88,6 +88,7 @@ export namespace Config {
     result.agent = result.agent || {}
     result.mode = result.mode || {}
     result.plugin = result.plugin || []
+    result.privacy = result.privacy || {}
 
     const directories = [
       Global.Path.config,
@@ -536,6 +537,14 @@ export namespace Config {
     })
   export type Permission = z.infer<typeof Permission>
 
+  export const Privacy = z.object({
+    disableOpencodeCloud: z
+      .boolean()
+      .optional()
+      .describe("Disable requests to OpenCode-hosted endpoints (e.g. opncd.ai, *.opencode.ai)"),
+  })
+  export type Privacy = z.infer<typeof Privacy>
+
   export const Command = z.object({
     template: z.string(),
     description: z.string().optional(),
@@ -870,6 +879,7 @@ export namespace Config {
       logLevel: Log.Level.optional().describe("Log level"),
       tui: TUI.optional().describe("TUI specific settings"),
       server: Server.optional().describe("Server configuration for opencode serve and web commands"),
+      privacy: Privacy.optional().describe("Privacy and network controls"),
       command: z
         .record(z.string(), Command)
         .optional()

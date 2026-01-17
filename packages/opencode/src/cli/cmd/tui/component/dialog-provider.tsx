@@ -8,7 +8,7 @@ import { DialogPrompt } from "../ui/dialog-prompt"
 import { Link } from "../ui/link"
 import { useTheme } from "../context/theme"
 import { TextAttributes } from "@opentui/core"
-import type { ProviderAuthAuthorization } from "@opencode-ai/sdk/v2"
+import type { ProviderAuthAuthorization, ProviderListResponse } from "@opencode-ai/sdk/v2"
 import { DialogModel } from "./dialog-model"
 import { useKeyboard } from "@opentui/solid"
 import { Clipboard } from "@tui/util/clipboard"
@@ -21,6 +21,34 @@ const PROVIDER_PRIORITY: Record<string, number> = {
   openai: 3,
   google: 4,
 }
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0", "host.docker.internal"])
+type ProviderInfo = ProviderListResponse["all"][number]
+
+function normalizeUrl(input: string) {
+  if (/^[a-z]+:\/\//i.test(input)) return input
+  return `http://${input}`
+}
+
+function isLocalUrl(input?: string) {
+  if (!input) return false
+  try {
+    const url = new URL(normalizeUrl(input))
+    return LOCAL_HOSTS.has(url.hostname)
+  } catch {
+    return false
+  }
+}
+
+function isLocalProvider(provider: ProviderInfo) {
+  const options = provider.options ?? {}
+  const candidates: string[] = []
+  if (typeof options.baseURL === "string") candidates.push(options.baseURL)
+  if (typeof options.endpoint === "string") candidates.push(options.endpoint)
+  for (const model of Object.values(provider.models ?? {})) {
+    if (typeof model.api?.url === "string") candidates.push(model.api.url)
+  }
+  return candidates.some(isLocalUrl)
+}
 
 export function createDialogProviderOptions() {
   const sync = useSync()
@@ -30,19 +58,43 @@ export function createDialogProviderOptions() {
   const options = createMemo(() => {
     return pipe(
       sync.data.provider_next.all,
-      sortBy((x) => PROVIDER_PRIORITY[x.id] ?? 99),
       map((provider) => {
+        const isPopular = provider.id in PROVIDER_PRIORITY
+        const isLocal = !isPopular && isLocalProvider(provider)
         const isConnected = connected().has(provider.id)
-        return {
-          title: provider.name,
-          value: provider.id,
-          description: {
+        const isDisabled = isLocal && !isConnected
+        const descriptionParts = [
+          {
             opencode: "(Recommended)",
             anthropic: "(Claude Max or API key)",
             openai: "(ChatGPT Plus/Pro or API key)",
           }[provider.id],
-          category: provider.id in PROVIDER_PRIORITY ? "Popular" : "Other",
-          footer: isConnected ? "Connected" : undefined,
+          isDisabled ? "(disabled)" : undefined,
+        ].filter(Boolean)
+        return {
+          provider,
+          category: isPopular ? "Popular" : isLocal ? "Local" : "Other",
+          groupRank: isPopular ? 0 : isLocal ? 1 : 2,
+          priority: PROVIDER_PRIORITY[provider.id] ?? 99,
+          isConnected,
+          isDisabled,
+          description: descriptionParts.join(" "),
+        }
+      }),
+      sortBy(
+        (item) => item.groupRank,
+        (item) => (item.groupRank === 0 ? item.priority : 0),
+        (item) => item.provider.name,
+      ),
+      map((item) => {
+        const provider = item.provider
+        return {
+          title: provider.name,
+          value: provider.id,
+          description: item.description || undefined,
+          category: item.category,
+          footer: item.isConnected ? "Connected" : undefined,
+          disabled: item.isDisabled,
           async onSelect() {
             const methods = sync.data.provider_auth[provider.id] ?? [
               {
@@ -109,7 +161,7 @@ export function createDialogProviderOptions() {
 
 export function DialogProvider() {
   const options = createDialogProviderOptions()
-  return <DialogSelect title="Connect a provider" options={options()} />
+  return <DialogSelect title="Connect a provider" options={options()} showDisabled />
 }
 
 interface AutoMethodProps {

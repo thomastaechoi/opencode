@@ -20,6 +20,7 @@ export interface DialogSelectProps<T> {
   onFilter?: (query: string) => void
   onSelect?: (option: DialogSelectOption<T>) => void
   skipFilter?: boolean
+  showDisabled?: boolean
   keybind?: {
     keybind?: Keybind.Info
     title: string
@@ -71,13 +72,11 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   let input: InputRenderable
 
   const filtered = createMemo(() => {
-    if (props.skipFilter) {
-      return props.options.filter((x) => x.disabled !== true)
-    }
+    const options = props.showDisabled ? props.options : props.options.filter((x) => x.disabled !== true)
+    if (props.skipFilter) return options
     const needle = store.filter.toLowerCase()
     const result = pipe(
-      props.options,
-      filter((x) => x.disabled !== true),
+      options,
       (x) => (!needle ? x : fuzzysort.go(needle, x, { keys: ["title", "category"] }).map((x) => x.obj)),
     )
     return result
@@ -124,13 +123,30 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
 
   function move(direction: number) {
     if (flat().length === 0) return
-    let next = store.selected + direction
-    if (next < 0) next = flat().length - 1
-    if (next >= flat().length) next = 0
-    moveTo(next)
+    let next = store.selected
+    for (let attempts = 0; attempts < flat().length; attempts++) {
+      next += direction
+      if (next < 0) next = flat().length - 1
+      if (next >= flat().length) next = 0
+      if (!flat()[next]?.disabled) {
+        moveTo(next)
+        return
+      }
+    }
   }
 
   function moveTo(next: number, center = false) {
+    const items = flat()
+    if (items.length === 0) return
+    if (items[next]?.disabled) {
+      for (let offset = 0; offset < items.length; offset++) {
+        const index = (next + offset) % items.length
+        if (!items[index]?.disabled) {
+          next = index
+          break
+        }
+      }
+    }
     setStore("selected", next)
     props.onMove?.(selected()!)
     if (!scroll) return
@@ -165,7 +181,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     if (evt.name === "end") moveTo(flat().length - 1)
     if (evt.name === "return") {
       const option = selected()
-      if (option) {
+      if (option && !option.disabled) {
         evt.preventDefault()
         evt.stopPropagation()
         if (option.onSelect) option.onSelect(dialog)
@@ -253,36 +269,39 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                 </Show>
                 <For each={options}>
                   {(option) => {
-                    const active = createMemo(() => isDeepEqual(option.value, selected()?.value))
-                    const current = createMemo(() => isDeepEqual(option.value, props.current))
-                    return (
-                      <box
-                        id={JSON.stringify(option.value)}
-                        flexDirection="row"
-                        onMouseUp={() => {
-                          option.onSelect?.(dialog)
-                          props.onSelect?.(option)
-                        }}
-                        onMouseOver={() => {
-                          const index = flat().findIndex((x) => isDeepEqual(x.value, option.value))
-                          if (index === -1) return
-                          moveTo(index)
+                        const active = createMemo(() => isDeepEqual(option.value, selected()?.value))
+                        const current = createMemo(() => isDeepEqual(option.value, props.current))
+                        return (
+                          <box
+                            id={JSON.stringify(option.value)}
+                            flexDirection="row"
+                            onMouseUp={() => {
+                              if (option.disabled) return
+                              option.onSelect?.(dialog)
+                              props.onSelect?.(option)
+                            }}
+                            onMouseOver={() => {
+                              if (option.disabled) return
+                              const index = flat().findIndex((x) => isDeepEqual(x.value, option.value))
+                              if (index === -1) return
+                              moveTo(index)
                         }}
                         backgroundColor={active() ? (option.bg ?? theme.primary) : RGBA.fromInts(0, 0, 0, 0)}
                         paddingLeft={current() || option.gutter ? 1 : 3}
                         paddingRight={3}
                         gap={1}
-                      >
-                        <Option
-                          title={option.title}
-                          footer={option.footer}
-                          description={option.description !== category ? option.description : undefined}
-                          active={active()}
-                          current={current()}
-                          gutter={option.gutter}
-                        />
-                      </box>
-                    )
+                          >
+                            <Option
+                              title={option.title}
+                              footer={option.footer}
+                              description={option.description !== category ? option.description : undefined}
+                              active={active()}
+                              current={current()}
+                              gutter={option.gutter}
+                              disabled={option.disabled}
+                            />
+                          </box>
+                        )
                   }}
                 </For>
               </>
@@ -316,6 +335,7 @@ function Option(props: {
   footer?: JSX.Element | string
   gutter?: JSX.Element
   onMouseOver?: () => void
+  disabled?: boolean
 }) {
   const { theme } = useTheme()
   const fg = selectedForeground(theme)
@@ -334,8 +354,8 @@ function Option(props: {
       </Show>
       <text
         flexGrow={1}
-        fg={props.active ? fg : props.current ? theme.primary : theme.text}
-        attributes={props.active ? TextAttributes.BOLD : undefined}
+        fg={props.disabled ? theme.textMuted : props.active ? fg : props.current ? theme.primary : theme.text}
+        attributes={props.active && !props.disabled ? TextAttributes.BOLD : undefined}
         overflow="hidden"
         paddingLeft={3}
       >

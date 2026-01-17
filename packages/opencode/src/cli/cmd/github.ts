@@ -27,6 +27,7 @@ import { Bus } from "../../bus"
 import { MessageV2 } from "../../session/message-v2"
 import { SessionPrompt } from "@/session/prompt"
 import { $ } from "bun"
+import { Privacy } from "@/util/privacy"
 
 type GitHubAuthor = {
   login: string
@@ -354,6 +355,10 @@ export const GithubInstallCommand = cmd({
             s.stop("Installed GitHub app")
 
             async function getInstallation() {
+              Privacy.assertOpencodeCloudAllowed({
+                feature: "github app installation check",
+                url: `https://api.opencode.ai/get_github_app_installation?owner=${app.owner}&repo=${app.repo}`,
+              })
               return await fetch(
                 `https://api.opencode.ai/get_github_app_installation?owner=${app.owner}&repo=${app.repo}`,
               )
@@ -683,8 +688,9 @@ export const GithubRunCommand = cmd({
 
       function normalizeOidcBaseUrl(): string {
         const value = process.env["OIDC_BASE_URL"]
-        if (!value) return "https://api.opencode.ai"
-        return value.replace(/\/+$/, "")
+        const base = (value ? value : "https://api.opencode.ai").replace(/\/+$/, "")
+        Privacy.assertOpencodeCloudAllowed({ feature: "github oidc base url", url: base })
+        return base
       }
 
       function isIssueCommentEvent(
@@ -972,6 +978,7 @@ export const GithubRunCommand = cmd({
       }
 
       async function exchangeForAppToken(token: string) {
+        Privacy.assertOpencodeCloudAllowed({ feature: "github app token exchange", url: oidcBaseUrl })
         const response = token.startsWith("github_pat_")
           ? await fetch(`${oidcBaseUrl}/exchange_github_app_token_with_pat`, {
               method: "POST",

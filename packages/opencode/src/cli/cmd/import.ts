@@ -5,6 +5,8 @@ import { bootstrap } from "../bootstrap"
 import { Storage } from "../../storage/storage"
 import { Instance } from "../../project/instance"
 import { EOL } from "os"
+import { Config } from "../../config/config"
+import { Privacy } from "../../util/privacy"
 
 export const ImportCommand = cmd({
   command: "import <file>",
@@ -37,6 +39,9 @@ export const ImportCommand = cmd({
           process.stdout.write(EOL)
           return
         }
+
+        const cfg = await Config.get().catch(() => undefined)
+        Privacy.assertOpencodeCloudAllowed({ feature: "import share", url: args.file, config: cfg })
 
         const slug = urlMatch[1]
         const response = await fetch(`https://opncd.ai/api/share/${slug}`)

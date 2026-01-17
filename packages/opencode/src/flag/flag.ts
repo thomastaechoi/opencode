@@ -4,6 +4,9 @@ export namespace Flag {
   export const OPENCODE_CONFIG = process.env["OPENCODE_CONFIG"]
   export const OPENCODE_CONFIG_DIR = process.env["OPENCODE_CONFIG_DIR"]
   export const OPENCODE_CONFIG_CONTENT = process.env["OPENCODE_CONFIG_CONTENT"]
+  // Privacy / networking
+  // When enabled, opencode will refuse to contact OpenCode-hosted endpoints (e.g. opncd.ai, *.opencode.ai).
+  export const OPENCODE_DISABLE_OPENCODE_CLOUD = truthy("OPENCODE_DISABLE_OPENCODE_CLOUD") || truthy("OPENCODE_PRIVACY")
   export const OPENCODE_DISABLE_AUTOUPDATE = truthy("OPENCODE_DISABLE_AUTOUPDATE")
   export const OPENCODE_DISABLE_PRUNE = truthy("OPENCODE_DISABLE_PRUNE")
   export const OPENCODE_DISABLE_TERMINAL_TITLE = truthy("OPENCODE_DISABLE_TERMINAL_TITLE")

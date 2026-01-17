@@ -1,8 +1,10 @@
 import { Bus } from "../bus"
+import { Config } from "../config/config"
 import { Installation } from "../installation"
 import { Session } from "../session"
 import { MessageV2 } from "../session/message-v2"
 import { Log } from "../util/log"
+import { Privacy } from "../util/privacy"
 
 export namespace Share {
   const log = Log.create({ service: "share" })
@@ -24,6 +26,8 @@ export namespace Share {
         const content = pending.get(key)
         if (content === undefined) return
         pending.delete(key)
+        const cfg = await Config.get().catch(() => undefined)
+        Privacy.assertOpencodeCloudAllowed({ feature: "legacy share sync", url: URL, config: cfg })
 
         return fetch(`${URL}/share_sync`, {
           method: "POST",
@@ -70,6 +74,8 @@ export namespace Share {
     (Installation.isPreview() || Installation.isLocal() ? "https://api.dev.opencode.ai" : "https://api.opencode.ai")
 
   export async function create(sessionID: string) {
+    const cfg = await Config.get().catch(() => undefined)
+    Privacy.assertOpencodeCloudAllowed({ feature: "legacy share create", url: URL, config: cfg })
     return fetch(`${URL}/share_create`, {
       method: "POST",
       body: JSON.stringify({ sessionID: sessionID }),
@@ -79,6 +85,8 @@ export namespace Share {
   }
 
   export async function remove(sessionID: string, secret: string) {
+    const cfg = await Config.get().catch(() => undefined)
+    Privacy.assertOpencodeCloudAllowed({ feature: "legacy share delete", url: URL, config: cfg })
     return fetch(`${URL}/share_delete`, {
       method: "POST",
       body: JSON.stringify({ sessionID, secret }),
