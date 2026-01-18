@@ -1,3 +1,4 @@
+import { test, expect } from "bun:test"
 import { Privacy } from "@/util/privacy"
 
 test("isOpenCodeHostedUrl detects opencode-hosted domains", () => {
