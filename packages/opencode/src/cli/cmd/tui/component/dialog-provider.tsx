@@ -41,12 +41,13 @@ function isLocalUrl(input?: string) {
 }
 
 function isLocalProvider(provider: ProviderInfo) {
-  const options = provider.options ?? {}
+  const options = (provider as unknown as { options?: Record<string, unknown> }).options ?? {}
   const candidates: string[] = []
   if (typeof options.baseURL === "string") candidates.push(options.baseURL)
   if (typeof options.endpoint === "string") candidates.push(options.endpoint)
   for (const model of Object.values(provider.models ?? {})) {
-    if (typeof model.api?.url === "string") candidates.push(model.api.url)
+    const api = (model as unknown as { api?: { url?: string } }).api
+    if (typeof api?.url === "string") candidates.push(api.url)
   }
   return candidates.some(isLocalUrl)
 }
