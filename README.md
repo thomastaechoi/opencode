@@ -86,6 +86,34 @@ This is used internally and can be invoked using `@general` in messages.
 
 Learn more about [agents](https://opencode.ai/docs/agents).
 
+### Fork Customizations
+
+This fork includes a few local workflow changes:
+
+- **General** primary agent (non-coding) defined in `.opencode/agent/general.md`, set as default in `.opencode/opencode.jsonc`.
+- Local-only Ollama model auto-discovery at startup, plus a "Local Models" section in the model picker.
+- Startup toast warning if any MCP servers are configured or enabled.
+- External MCP configuration removed from `.opencode/opencode.jsonc` by default.
+- **WebSearch tool** using Google Custom Search API (replaces Exa API).
+
+#### WebSearch Setup
+
+The WebSearch tool allows agents to search the web for current information. To enable it:
+
+1. Create a Custom Search Engine at https://programmablesearchengine.google.com/
+2. Enable "Search the entire web" in the search engine settings
+3. Get an API key from https://console.cloud.google.com/apis/credentials
+4. Set environment variables:
+
+```bash
+export GOOGLE_API_KEY="your-api-key"
+export GOOGLE_SEARCH_ENGINE_ID="your-search-engine-id"
+```
+
+Or add to a `.env` file in the project root (gitignored).
+
+**Free tier:** 100 queries/day.
+
 ### Documentation
 
 For more info on how to configure OpenCode [**head over to our docs**](https://opencode.ai/docs).

@@ -20,7 +20,6 @@ import { type ToolDefinition } from "@opencode-ai/plugin"
 import z from "zod"
 import { Plugin } from "../plugin"
 import { WebSearchTool } from "./websearch"
-import { CodeSearchTool } from "./codesearch"
 import { Flag } from "@/flag/flag"
 import { Log } from "@/util/log"
 import { LspTool } from "./lsp"
@@ -106,7 +105,6 @@ export namespace ToolRegistry {
       TodoWriteTool,
       TodoReadTool,
       WebSearchTool,
-      CodeSearchTool,
       SkillTool,
       ...(Flag.OPENCODE_EXPERIMENTAL_LSP_TOOL ? [LspTool] : []),
       ...(config.experimental?.batch_tool === true ? [BatchTool] : []),
@@ -122,21 +120,13 @@ export namespace ToolRegistry {
   export async function tools(providerID: string, agent?: Agent.Info) {
     const tools = await all()
     const result = await Promise.all(
-      tools
-        .filter((t) => {
-          // Enable websearch/codesearch for zen users OR via enable flag
-          if (t.id === "codesearch" || t.id === "websearch") {
-            return providerID === "opencode" || Flag.OPENCODE_ENABLE_EXA
-          }
-          return true
-        })
-        .map(async (t) => {
-          using _ = log.time(t.id)
-          return {
-            id: t.id,
-            ...(await t.init({ agent })),
-          }
-        }),
+      tools.map(async (t) => {
+        using _ = log.time(t.id)
+        return {
+          id: t.id,
+          ...(await t.init({ agent })),
+        }
+      }),
     )
     return result
   }
