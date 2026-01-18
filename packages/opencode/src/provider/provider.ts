@@ -39,6 +39,127 @@ import { createVercel } from "@ai-sdk/vercel"
 import { createGitLab } from "@gitlab/gitlab-ai-provider"
 import { ProviderTransform } from "./transform"
 
+const OLLAMA_PROVIDER_ID = "ollama"
+const OLLAMA_DEFAULT_BASE_URL = "http://127.0.0.1:11434/v1"
+const OLLAMA_LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "::1", "0.0.0.0", "host.docker.internal"])
+const OLLAMA_DISCOVERY_TIMEOUT_MS = 1200
+
+function normalizeUrl(value: string) {
+  if (/^[a-z]+:\/\//i.test(value)) return value
+  return `http://${value}`
+}
+
+function isLocalUrl(value?: string) {
+  if (!value) return false
+  try {
+    const url = new URL(normalizeUrl(value))
+    return OLLAMA_LOCAL_HOSTS.has(url.hostname)
+  } catch {
+    return false
+  }
+}
+
+function toOpenAiBaseUrl(value: string) {
+  const url = new URL(normalizeUrl(value))
+  let path = url.pathname.replace(/\/+$/, "")
+  if (!path || path === "/") {
+    path = "/v1"
+  } else if (!path.endsWith("/v1")) {
+    path = `${path}/v1`
+  }
+  url.pathname = path
+  return url.toString()
+}
+
+function toOpenAiModelsUrl(value: string) {
+  const url = new URL(toOpenAiBaseUrl(value))
+  url.pathname = `${url.pathname.replace(/\/+$/, "")}/models`
+  return url.toString()
+}
+
+function toOllamaTagsUrl(value: string) {
+  const url = new URL(toOpenAiBaseUrl(value))
+  let path = url.pathname.replace(/\/+$/, "")
+  if (path.endsWith("/v1")) path = path.slice(0, -3)
+  url.pathname = `${path}/api/tags`.replace(/\/{2,}/g, "/")
+  return url.toString()
+}
+
+async function fetchJson(url: string) {
+  const result = await fetch(url, { signal: AbortSignal.timeout(OLLAMA_DISCOVERY_TIMEOUT_MS) }).catch(() => undefined)
+  if (!result?.ok) return undefined
+  return result.json().catch(() => undefined)
+}
+
+async function discoverOllamaModels(baseUrl: string) {
+  const models = new Set<string>()
+  const openAiData = await fetchJson(toOpenAiModelsUrl(baseUrl))
+  if (Array.isArray(openAiData?.data)) {
+    for (const item of openAiData.data) {
+      if (typeof item?.id === "string") models.add(item.id)
+    }
+  }
+
+  if (models.size > 0) return [...models].sort()
+
+  const tagsData = await fetchJson(toOllamaTagsUrl(baseUrl))
+  if (Array.isArray(tagsData?.models)) {
+    for (const item of tagsData.models) {
+      if (typeof item?.name === "string") models.add(item.name)
+      else if (typeof item?.model === "string") models.add(item.model)
+    }
+  }
+  return [...models].sort()
+}
+
+async function discoverOllamaProvider(config: Config.Info): Promise<ModelsDev.Provider | undefined> {
+  const providerConfig = config.provider?.[OLLAMA_PROVIDER_ID]
+  const options = providerConfig?.options ?? {}
+  const envBase = Env.get("OLLAMA_BASE_URL") ?? Env.get("OLLAMA_HOST")
+  const rawBase =
+    (typeof options.baseURL === "string" ? options.baseURL : undefined) ??
+    (typeof options.url === "string" ? options.url : undefined) ??
+    (typeof envBase === "string" ? envBase : undefined) ??
+    OLLAMA_DEFAULT_BASE_URL
+
+  const baseUrl = toOpenAiBaseUrl(rawBase)
+  if (!isLocalUrl(baseUrl)) return undefined
+
+  const modelIds = await discoverOllamaModels(baseUrl)
+  if (modelIds.length === 0) return undefined
+
+  const models: Record<string, ModelsDev.Model> = {}
+  for (const modelId of modelIds) {
+    models[modelId] = {
+      id: modelId,
+      name: modelId,
+      release_date: "local",
+      attachment: false,
+      reasoning: false,
+      temperature: true,
+      tool_call: true,
+      limit: {
+        context: 8192,
+        output: 2048,
+      },
+      modalities: {
+        input: ["text"],
+        output: ["text"],
+      },
+      options: {},
+    }
+  }
+
+  return {
+    id: OLLAMA_PROVIDER_ID,
+    name: "Ollama",
+    api: baseUrl,
+    env: [],
+    npm: "@ai-sdk/openai-compatible",
+    models,
+  }
+}
+
 export namespace Provider {
   const log = Log.create({ service: "provider" })
 
@@ -699,6 +820,18 @@ export namespace Provider {
       return true
     }
 
+    const discoveredOllama = isProviderAllowed(OLLAMA_PROVIDER_ID)
+      ? await discoverOllamaProvider(config).catch(() => undefined)
+      : undefined
+    if (discoveredOllama) {
+      const parsed = fromModelsDevProvider(discoveredOllama)
+      if (database[OLLAMA_PROVIDER_ID]) {
+        database[OLLAMA_PROVIDER_ID].models = mergeDeep(database[OLLAMA_PROVIDER_ID].models, parsed.models)
+      } else {
+        database[OLLAMA_PROVIDER_ID] = parsed
+      }
+    }
+
     const providers: { [providerID: string]: Info } = {}
     const languages = new Map<string, LanguageModelV2>()
     const modelLoaders: {
@@ -818,6 +951,12 @@ export namespace Provider {
         parsed.models[modelID] = parsedModel
       }
       database[providerID] = parsed
+    }
+
+    if (discoveredOllama) {
+      mergeProvider(OLLAMA_PROVIDER_ID, {
+        source: "custom",
+      })
     }
 
     // load env
