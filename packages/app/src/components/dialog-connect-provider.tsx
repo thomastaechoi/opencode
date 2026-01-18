@@ -20,6 +20,7 @@ import { useGlobalSync } from "@/context/global-sync"
 import { usePlatform } from "@/context/platform"
 import { DialogSelectModel } from "./dialog-select-model"
 import { DialogSelectProvider } from "./dialog-select-provider"
+import { isLocalProvider } from "@/hooks/use-providers"
 
 export function DialogConnectProvider(props: { provider: string }) {
   const dialog = useDialog()
@@ -28,15 +29,21 @@ export function DialogConnectProvider(props: { provider: string }) {
   const platform = usePlatform()
   const language = useLanguage()
   const provider = createMemo(() => globalSync.data.provider.all.find((x) => x.id === props.provider)!)
-  const methods = createMemo(
-    () =>
-      globalSync.data.provider_auth[props.provider] ?? [
-        {
-          type: "api",
-          label: language.t("provider.connect.method.apiKey"),
-        },
-      ],
-  )
+  const isLocal = createMemo(() => {
+    const value = provider()
+    return value ? isLocalProvider(value) : false
+  })
+  const methods = createMemo(() => {
+    const available = globalSync.data.provider_auth[props.provider]
+    if (available && available.length > 0) return available
+    if (isLocal()) return []
+    return [
+      {
+        type: "api",
+        label: language.t("provider.connect.method.apiKey"),
+      },
+    ]
+  })
   const [store, setStore] = createStore({
     methodIndex: undefined as undefined | number,
     authorization: undefined as undefined | ProviderAuthAuthorization,
@@ -105,6 +112,10 @@ export function DialogConnectProvider(props: { provider: string }) {
   }
 
   onMount(() => {
+    if (methods().length === 0) {
+      dialog.show(() => <DialogSelectModel provider={props.provider} />)
+      return
+    }
     if (methods().length === 1) {
       selectMethod(0)
     }

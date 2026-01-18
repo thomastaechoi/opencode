@@ -39,6 +39,11 @@ export const DialogSelectProvider: Component = () => {
           const bGroup = getProviderGroup(b)
           if (aGroup !== bGroup) return groupOrder[aGroup] - groupOrder[bGroup]
           if (aGroup === "Popular") return popularProviders.indexOf(a.id) - popularProviders.indexOf(b.id)
+          if (aGroup === "Local") {
+            const aDisabled = isDisabled(a)
+            const bDisabled = isDisabled(b)
+            if (aDisabled !== bDisabled) return aDisabled ? 1 : -1
+          }
           return a.name.localeCompare(b.name)
         }}
         sortGroupsBy={(a, b) => {

@@ -13,6 +13,7 @@ import { DialogModel } from "./dialog-model"
 import { useKeyboard } from "@opentui/solid"
 import { Clipboard } from "@tui/util/clipboard"
 import { useToast } from "../ui/toast"
+import { useLocal } from "@tui/context/local"
 
 const PROVIDER_PRIORITY: Record<string, number> = {
   opencode: 0,
@@ -54,7 +55,9 @@ export function createDialogProviderOptions() {
   const sync = useSync()
   const dialog = useDialog()
   const sdk = useSDK()
+  const local = useLocal()
   const connected = createMemo(() => new Set(sync.data.provider_next.connected))
+  const activeProviderID = createMemo(() => local.model.current()?.providerID)
   const options = createMemo(() => {
     return pipe(
       sync.data.provider_next.all,
@@ -63,6 +66,7 @@ export function createDialogProviderOptions() {
         const isLocal = !isPopular && isLocalProvider(provider)
         const isConnected = connected().has(provider.id)
         const isDisabled = isLocal && !isConnected
+        const isActive = isConnected && activeProviderID() === provider.id
         const descriptionParts = [
           {
             opencode: "(Recommended)",
@@ -77,12 +81,15 @@ export function createDialogProviderOptions() {
           groupRank: isPopular ? 0 : isLocal ? 1 : 2,
           priority: PROVIDER_PRIORITY[provider.id] ?? 99,
           isConnected,
+          isLocal,
           isDisabled,
+          isActive,
           description: descriptionParts.join(" "),
         }
       }),
       sortBy(
         (item) => item.groupRank,
+        (item) => (item.groupRank === 1 ? (item.isDisabled ? 1 : 0) : 0),
         (item) => (item.groupRank === 0 ? item.priority : 0),
         (item) => item.provider.name,
       ),
@@ -93,9 +100,12 @@ export function createDialogProviderOptions() {
           value: provider.id,
           description: item.description || undefined,
           category: item.category,
-          footer: item.isConnected ? "Connected" : undefined,
+          footer: item.isActive ? "Active" : item.isConnected ? "Configured" : undefined,
           disabled: item.isDisabled,
           async onSelect() {
+            if (item.isConnected) {
+              return dialog.replace(() => <DialogModel providerID={provider.id} />)
+            }
             const methods = sync.data.provider_auth[provider.id] ?? [
               {
                 type: "api",
