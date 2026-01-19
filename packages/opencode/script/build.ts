@@ -129,7 +129,7 @@ for (const item of targets) {
     sourcemap: "external",
     compile: {
       autoloadBunfig: false,
-      autoloadDotenv: false,
+      autoloadDotenv: true,
       //@ts-ignore (bun types aren't up to date)
       autoloadTsconfig: true,
       autoloadPackageJson: true,
