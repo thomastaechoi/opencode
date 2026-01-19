@@ -28,11 +28,10 @@ interface GoogleSearchResponse {
 }
 
 export const WebSearchTool = Tool.define("websearch", async () => {
-  const apiKey = process.env.GOOGLE_API_KEY
-  const searchEngineId = process.env.GOOGLE_SEARCH_ENGINE_ID
-
   return {
     get description() {
+      const apiKey = process.env.GOOGLE_API_KEY
+      const searchEngineId = process.env.GOOGLE_SEARCH_ENGINE_ID
       if (!apiKey || !searchEngineId) {
         return `${DESCRIPTION.replace("{{date}}", new Date().toISOString().slice(0, 10))}\n\n**NOTE:** WebSearch is not configured. Set GOOGLE_API_KEY and GOOGLE_SEARCH_ENGINE_ID environment variables.`
       }
@@ -48,6 +47,8 @@ export const WebSearchTool = Tool.define("websearch", async () => {
         .describe("Number of search results to return (1-10, default: 10)"),
     }),
     async execute(params, ctx) {
+      const apiKey = process.env.GOOGLE_API_KEY
+      const searchEngineId = process.env.GOOGLE_SEARCH_ENGINE_ID
       if (!apiKey || !searchEngineId) {
         throw new Error(
           "WebSearch is not configured. Set GOOGLE_API_KEY and GOOGLE_SEARCH_ENGINE_ID environment variables.\n\n" +
