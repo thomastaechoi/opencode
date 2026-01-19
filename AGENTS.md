@@ -4,3 +4,4 @@
 - To regenerate the JavaScript SDK, run `./packages/sdk/js/script/build.ts`.
 - ALWAYS USE PARALLEL TOOLS WHEN APPLICABLE.
 - The default branch in this repo is `dev`.
+- Fork notes: default primary agent is `general` (see `.opencode/agent/general.md` + `.opencode/opencode.jsonc`); local-only Ollama auto-discovery and MCP startup warnings are enabled; external MCP config is removed by default.

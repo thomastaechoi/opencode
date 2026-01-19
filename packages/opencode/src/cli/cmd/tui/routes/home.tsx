@@ -1,12 +1,12 @@
 import { Prompt, type PromptRef } from "@tui/component/prompt"
-import { createMemo, Match, onMount, Show, Switch } from "solid-js"
+import { createEffect, createMemo, Match, onMount, Show, Switch } from "solid-js"
 import { useTheme } from "@tui/context/theme"
 import { useKeybind } from "@tui/context/keybind"
 import { Logo } from "../component/logo"
 import { Tips } from "../component/tips"
 import { Locale } from "@/util/locale"
 import { useSync } from "../context/sync"
-import { Toast } from "../ui/toast"
+import { Toast, useToast } from "../ui/toast"
 import { useArgs } from "../context/args"
 import { useDirectory } from "../context/directory"
 import { useRouteData } from "@tui/context/route"
@@ -17,15 +17,18 @@ import { useCommandDialog } from "../component/dialog-command"
 
 // TODO: what is the best way to do this?
 let once = false
+let mcpNoticeShown = false
 
 export function Home() {
   const sync = useSync()
   const kv = useKV()
   const { theme } = useTheme()
+  const toast = useToast()
   const route = useRouteData("home")
   const promptRef = usePromptRef()
   const command = useCommandDialog()
-  const mcp = createMemo(() => Object.keys(sync.data.mcp).length > 0)
+  const mcpEntries = createMemo(() => Object.entries(sync.data.mcp))
+  const mcp = createMemo(() => mcpEntries().length > 0)
   const mcpError = createMemo(() => {
     return Object.values(sync.data.mcp).some((x) => x.status === "failed")
   })
@@ -40,6 +43,25 @@ export function Home() {
     // Don't show tips for first-time users
     if (isFirstTimeUser()) return false
     return !tipsHidden()
+  })
+
+  createEffect(() => {
+    if (mcpNoticeShown) return
+    const entries = mcpEntries()
+    if (entries.length === 0) return
+
+    const enabled = entries.filter(([_, status]) => status.status !== "disabled")
+    const display = (enabled.length > 0 ? enabled : entries)
+      .map(([name, status]) => `${name} (${status.status})`)
+      .join(", ")
+
+    const message =
+      enabled.length > 0
+        ? `MCP enabled: ${display}. Run /mcp to review.`
+        : `MCP configured (disabled): ${display}. Run /mcp to review.`
+
+    toast.show({ message, variant: enabled.length > 0 ? "warning" : "info" })
+    mcpNoticeShown = true
   })
 
   command.register(() => [
