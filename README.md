@@ -114,6 +114,55 @@ Or add to a `.env` file in the project root (gitignored).
 
 **Free tier:** 100 queries/day.
 
+### Development
+
+#### Prerequisites
+
+- [Bun](https://bun.sh/) v1.3.5+
+
+```bash
+# Install dependencies
+bun install
+```
+
+#### Run from Source
+
+```bash
+# From project root
+bun dev
+```
+
+This runs TypeScript directly via Bun. Changes require restart. Note: `.env` is loaded from `packages/opencode/`, not the project root. Create a symlink if needed:
+
+```bash
+ln -s /path/to/project/.env /path/to/project/packages/opencode/.env
+```
+
+#### Build Standalone Binary
+
+```bash
+# Build for current platform only (fast)
+bun run --cwd packages/opencode build --single
+
+# Build for all platforms
+bun run --cwd packages/opencode build
+```
+
+Output: `packages/opencode/dist/opencode-<platform>-<arch>/bin/opencode`
+
+#### Run the Binary
+
+```bash
+# Direct
+./packages/opencode/dist/opencode-darwin-arm64/bin/opencode
+
+# Or set OPENCODE_BIN_PATH to use the wrapper
+export OPENCODE_BIN_PATH=/path/to/dist/opencode-darwin-arm64/bin/opencode
+opencode
+```
+
+The standalone binary auto-loads `.env` from the current working directory.
+
 ### Documentation
 
 For more info on how to configure OpenCode [**head over to our docs**](https://opencode.ai/docs).
