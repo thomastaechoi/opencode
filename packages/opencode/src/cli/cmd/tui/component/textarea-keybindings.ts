@@ -65,6 +65,7 @@ export function useTextareaKeybindings() {
     const keybinds = keybind.all
 
     return [
+      { name: "return", shift: true, action: "newline" },
       { name: "return", action: "submit" },
       { name: "return", meta: true, action: "newline" },
       ...TEXTAREA_ACTIONS.flatMap((action) => mapTextareaKeybindings(keybinds, action)),
