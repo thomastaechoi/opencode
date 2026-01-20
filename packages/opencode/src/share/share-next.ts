@@ -19,7 +19,10 @@ export namespace ShareNext {
     return base
   }
 
+  const disabled = process.env["OPENCODE_DISABLE_SHARE"] === "true" || process.env["OPENCODE_DISABLE_SHARE"] === "1"
+
   export async function init() {
+    if (disabled) return
     Bus.subscribe(Session.Event.Updated, async (evt) => {
       await sync(evt.properties.info.id, [
         {
@@ -67,6 +70,7 @@ export namespace ShareNext {
   }
 
   export async function create(sessionID: string) {
+    if (disabled) return { id: "", url: "", secret: "" }
     log.info("creating share", { sessionID })
     const result = await fetch(`${await url()}/api/share`, {
       method: "POST",
@@ -114,6 +118,7 @@ export namespace ShareNext {
 
   const queue = new Map<string, { timeout: NodeJS.Timeout; data: Map<string, Data> }>()
   async function sync(sessionID: string, data: Data[]) {
+    if (disabled) return
     const existing = queue.get(sessionID)
     if (existing) {
       for (const item of data) {
@@ -149,6 +154,7 @@ export namespace ShareNext {
   }
 
   export async function remove(sessionID: string) {
+    if (disabled) return
     log.info("removing share", { sessionID })
     const share = await get(sessionID)
     if (!share) return

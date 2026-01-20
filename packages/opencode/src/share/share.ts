@@ -13,6 +13,7 @@ export namespace Share {
   const pending = new Map<string, any>()
 
   export async function sync(key: string, content: any) {
+    if (disabled) return
     const [root, ...splits] = key.split("/")
     if (root !== "session") return
     const [sub, sessionID] = splits
@@ -73,7 +74,10 @@ export namespace Share {
     process.env["OPENCODE_API"] ??
     (Installation.isPreview() || Installation.isLocal() ? "https://api.dev.opencode.ai" : "https://api.opencode.ai")
 
+  const disabled = process.env["OPENCODE_DISABLE_SHARE"] === "true" || process.env["OPENCODE_DISABLE_SHARE"] === "1"
+
   export async function create(sessionID: string) {
+    if (disabled) return { url: "", secret: "" }
     const cfg = await Config.get().catch(() => undefined)
     Privacy.assertOpencodeCloudAllowed({ feature: "legacy share create", url: URL, config: cfg })
     return fetch(`${URL}/share_create`, {
@@ -85,6 +89,7 @@ export namespace Share {
   }
 
   export async function remove(sessionID: string, secret: string) {
+    if (disabled) return {}
     const cfg = await Config.get().catch(() => undefined)
     Privacy.assertOpencodeCloudAllowed({ feature: "legacy share delete", url: URL, config: cfg })
     return fetch(`${URL}/share_delete`, {

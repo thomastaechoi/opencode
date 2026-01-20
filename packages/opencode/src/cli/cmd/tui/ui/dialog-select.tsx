@@ -39,7 +39,7 @@ export interface DialogSelectOption<T = any> {
   disabled?: boolean
   bg?: RGBA
   gutter?: JSX.Element
-  onSelect?: (ctx: DialogContext, trigger?: "prompt") => void
+  onSelect?: (ctx: DialogContext) => void
 }
 
 export type DialogSelectRef<T> = {
@@ -53,6 +53,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   const [store, setStore] = createStore({
     selected: 0,
     filter: "",
+    input: "keyboard" as "keyboard" | "mouse",
   })
 
   createEffect(
@@ -75,11 +76,18 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
     const options = props.showDisabled ? props.options : props.options.filter((x) => x.disabled !== true)
     if (props.skipFilter) return options
     const needle = store.filter.toLowerCase()
-    const result = pipe(
-      options,
-      (x) => (!needle ? x : fuzzysort.go(needle, x, { keys: ["title", "category"] }).map((x) => x.obj)),
+    const result = pipe(options, (x) =>
+      !needle ? x : fuzzysort.go(needle, x, { keys: ["title", "category"] }).map((x) => x.obj),
     )
     return result
+  })
+
+  // When the filter changes due to how TUI works, the mousemove might still be triggered
+  // via a synthetic event as the layout moves underneath the cursor. This is a workaround to make sure the input mode remains keyboard
+  // that the mouseover event doesn't trigger when filtering.
+  createEffect(() => {
+    filtered()
+    setStore("input", "keyboard")
   })
 
   const grouped = createMemo(() => {
@@ -173,12 +181,15 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
 
   const keybind = useKeybind()
   useKeyboard((evt) => {
+    setStore("input", "keyboard")
+
     if (evt.name === "up" || (evt.ctrl && evt.name === "p")) move(-1)
     if (evt.name === "down" || (evt.ctrl && evt.name === "n")) move(1)
     if (evt.name === "pageup") move(-10)
     if (evt.name === "pagedown") move(10)
     if (evt.name === "home") moveTo(0)
     if (evt.name === "end") moveTo(flat().length - 1)
+
     if (evt.name === "return") {
       const option = selected()
       if (option && !option.disabled) {
@@ -269,39 +280,49 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                 </Show>
                 <For each={options}>
                   {(option) => {
-                        const active = createMemo(() => isDeepEqual(option.value, selected()?.value))
-                        const current = createMemo(() => isDeepEqual(option.value, props.current))
-                        return (
-                          <box
-                            id={JSON.stringify(option.value)}
-                            flexDirection="row"
-                            onMouseUp={() => {
-                              if (option.disabled) return
-                              option.onSelect?.(dialog)
-                              props.onSelect?.(option)
-                            }}
-                            onMouseOver={() => {
-                              if (option.disabled) return
-                              const index = flat().findIndex((x) => isDeepEqual(x.value, option.value))
-                              if (index === -1) return
-                              moveTo(index)
+                    const active = createMemo(() => isDeepEqual(option.value, selected()?.value))
+                    const current = createMemo(() => isDeepEqual(option.value, props.current))
+                    return (
+                      <box
+                        id={JSON.stringify(option.value)}
+                        flexDirection="row"
+                        onMouseMove={() => {
+                          setStore("input", "mouse")
+                        }}
+                        onMouseUp={() => {
+                          if (option.disabled) return
+                          option.onSelect?.(dialog)
+                          props.onSelect?.(option)
+                        }}
+                        onMouseOver={() => {
+                          if (option.disabled) return
+                          if (store.input !== "mouse") return
+                          const index = flat().findIndex((x) => isDeepEqual(x.value, option.value))
+                          if (index === -1) return
+                          moveTo(index)
+                        }}
+                        onMouseDown={() => {
+                          if (option.disabled) return
+                          const index = flat().findIndex((x) => isDeepEqual(x.value, option.value))
+                          if (index === -1) return
+                          moveTo(index)
                         }}
                         backgroundColor={active() ? (option.bg ?? theme.primary) : RGBA.fromInts(0, 0, 0, 0)}
                         paddingLeft={current() || option.gutter ? 1 : 3}
                         paddingRight={3}
                         gap={1}
-                          >
-                            <Option
-                              title={option.title}
-                              footer={option.footer}
-                              description={option.description !== category ? option.description : undefined}
-                              active={active()}
-                              current={current()}
-                              gutter={option.gutter}
-                              disabled={option.disabled}
-                            />
-                          </box>
-                        )
+                      >
+                        <Option
+                          title={option.title}
+                          footer={option.footer}
+                          description={option.description !== category ? option.description : undefined}
+                          active={active()}
+                          current={current()}
+                          gutter={option.gutter}
+                          disabled={option.disabled}
+                        />
+                      </box>
+                    )
                   }}
                 </For>
               </>
@@ -357,6 +378,7 @@ function Option(props: {
         fg={props.disabled ? theme.textMuted : props.active ? fg : props.current ? theme.primary : theme.text}
         attributes={props.active && !props.disabled ? TextAttributes.BOLD : undefined}
         overflow="hidden"
+        wrapMode="none"
         paddingLeft={3}
       >
         {Locale.truncate(props.title, 61)}
