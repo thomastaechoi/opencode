@@ -66,7 +66,7 @@
     "husky": "9.1.7",
     "prettier": "3.6.2",
     "sst": "3.17.23",
-    "turbo": "2.5.6"
+    "turbo": "2.7.5"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "3.933.0",
