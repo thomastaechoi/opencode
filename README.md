@@ -98,6 +98,35 @@ This fork includes a few local workflow changes:
 - External MCP configuration removed from `.opencode/opencode.jsonc` by default.
 - **WebSearch tool** using Google Custom Search API (replaces Exa API).
 
+#### Global "General" Agent Setup
+
+To use the "General" agent as your default across all projects (not just this repo), copy the configuration to your global config directory:
+
+1. **Copy the agent definition:**
+
+   ```bash
+   mkdir -p ~/.config/opencode/agents
+   cp .opencode/agent/general.md ~/.config/opencode/agents/general.md
+   ```
+
+2. **Create or update global config:**
+
+   ```bash
+   # Create the config file if it doesn't exist
+   cat > ~/.config/opencode/opencode.jsonc << 'EOF'
+   {
+     "$schema": "https://opencode.ai/config.json",
+     "default_agent": "general"
+   }
+   EOF
+   ```
+
+   Or if you already have a global config, just add `"default_agent": "general"` to it.
+
+3. **Verify:** Run `opencode` from any directory—it should now default to the "General" agent.
+
+> **Note:** The project-local `.opencode/` config in this repo will still take precedence when running from within this project.
+
 #### WebSearch Setup
 
 The WebSearch tool allows agents to search the web for current information. To enable it:
