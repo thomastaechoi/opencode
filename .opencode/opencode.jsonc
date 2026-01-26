@@ -12,6 +12,17 @@
   "provider": {
     "opencode": {
       "options": {},
+      "models": {
+        "gpt-5.2-codex": {
+          "variants": {
+            "high": {
+              "reasoningEffort": "high",
+              "reasoningSummary": "auto",
+              "include": ["reasoning.encrypted_content"],
+            },
+          },
+        },
+      },
     },
     "ollama": {
       "npm": "@ai-sdk/openai-compatible",

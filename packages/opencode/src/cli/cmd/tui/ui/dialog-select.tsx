@@ -73,12 +73,23 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
   let input: InputRenderable
 
   const filtered = createMemo(() => {
-    const options = props.showDisabled ? props.options : props.options.filter((x) => x.disabled !== true)
+    const options = pipe(
+      props.options,
+      filter((x) => (props.showDisabled ? true : x.disabled !== true)),
+    )
     if (props.skipFilter) return options
     const needle = store.filter.toLowerCase()
-    const result = pipe(options, (x) =>
-      !needle ? x : fuzzysort.go(needle, x, { keys: ["title", "category"] }).map((x) => x.obj),
-    )
+    if (!needle) return options
+
+    // prioritize title matches (weight: 2) over category matches (weight: 1).
+    // users typically search by the item name, and not its category.
+    const result = fuzzysort
+      .go(needle, options, {
+        keys: ["title", "category"],
+        scoreFn: (r) => r[0].score * 2 + r[1].score,
+      })
+      .map((x) => x.obj)
+
     return result
   })
 
@@ -131,16 +142,17 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
 
   function move(direction: number) {
     if (flat().length === 0) return
-    let next = store.selected
-    for (let attempts = 0; attempts < flat().length; attempts++) {
-      next += direction
-      if (next < 0) next = flat().length - 1
-      if (next >= flat().length) next = 0
-      if (!flat()[next]?.disabled) {
-        moveTo(next)
-        return
+    const items = flat()
+    const next = (() => {
+      const attempts = Array.from({ length: items.length }, (_, index) => index + 1)
+      for (const attempt of attempts) {
+        const index = store.selected + direction * attempt
+        const normalized = ((index % items.length) + items.length) % items.length
+        if (!items[normalized]?.disabled) return normalized
       }
-    }
+      return store.selected
+    })()
+    moveTo(next, true)
   }
 
   function moveTo(next: number, center = false) {
@@ -287,6 +299,7 @@ export function DialogSelect<T>(props: DialogSelectProps<T>) {
                         id={JSON.stringify(option.value)}
                         flexDirection="row"
                         onMouseMove={() => {
+                          if (option.disabled) return
                           setStore("input", "mouse")
                         }}
                         onMouseUp={() => {
